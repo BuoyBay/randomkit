@@ -1,0 +1,196 @@
+''' Explicitly seeded MT19937; noncryptographic and not synchronized.
+Public Class RandomGenerator
+    Private Property mWords As Array Of Integer = []
+    Private Property mIndex As Integer = 624
+
+    Public Sub Constructor(seed As Integer)
+        Dim word As Integer = seed Mod 4294967296
+        If word < 0 Then word += 4294967296
+        Array.Append(mWords, word)
+        For i As Integer = 1 To 623
+            word = (1812433253 * (word Xor (word \ 1073741824)) + i) Mod 4294967296
+            Array.Append(mWords, word)
+        Next
+    End Sub
+
+    ''' A raw tempered unsigned 32-bit word represented as Integer.
+    Public Function NextWord() As Integer
+        If mIndex = 624 Then
+            For i As Integer = 0 To 623
+                Dim y As Integer = (mWords(i) And 2147483648) + (mWords((i + 1) Mod 624) And 2147483647)
+                Dim mixed As Integer = y \ 2
+                If (y And 1) = 1 Then mixed = mixed Xor 2567483615
+                mWords(i) = mWords((i + 397) Mod 624) Xor mixed
+            Next
+            mIndex = 0
+        End If
+        Dim y As Integer = mWords(mIndex)
+        mIndex += 1
+        y = y Xor (y \ 2048)
+        y = y Xor ((y * 128) And 2636928640)
+        y = y Xor ((y * 32768) And 4022730752)
+        Return y Xor (y \ 262144)
+    End Function
+
+    ''' 53-bit grid k / 2^53 in [0, 1), consuming two words.
+    Public Function NextDouble() As Double
+        Dim high As Integer = Me.NextWord() \ 32
+        Dim low As Integer = Me.NextWord() \ 64
+        Dim highDouble As Double = high
+        Dim lowDouble As Double = low
+        Return (highDouble * 67108864.0 + lowDouble) / 9007199254740992.0
+    End Function
+
+    ''' Inclusive bounds. Integer-only bit rejection, including the whole signed range.
+    Public Function NextInteger(lower As Integer, upper As Integer) As Integer
+        If lower > upper Then Throw New InvalidArgumentException("Lower bound exceeds upper bound")
+        If lower = upper Then Return lower
+        Dim lowLo As Integer = lower Mod 4294967296
+        Dim lowHi As Integer = lower \ 4294967296
+        If lowLo < 0 Then
+            lowLo += 4294967296
+            lowHi -= 1
+        End If
+        lowHi += 2147483648
+        Dim topLo As Integer = upper Mod 4294967296
+        Dim topHi As Integer = upper \ 4294967296
+        If topLo < 0 Then
+            topLo += 4294967296
+            topHi -= 1
+        End If
+        topHi += 2147483648
+        Dim spanLo As Integer = topLo - lowLo
+        Dim spanHi As Integer = topHi - lowHi
+        If spanLo < 0 Then
+            spanLo += 4294967296
+            spanHi -= 1
+        End If
+        Dim mask As Integer = 1
+        Dim significant As Integer = spanLo
+        If spanHi > 0 Then significant = spanHi
+        While mask < significant
+            mask = mask * 2 + 1
+        End While
+        Dim drawHi As Integer
+        Dim drawLo As Integer
+        Do
+            If spanHi > 0 Then
+                drawHi = Me.NextWord() And mask
+                drawLo = Me.NextWord()
+            Else
+                drawHi = 0
+                drawLo = Me.NextWord() And mask
+            End If
+        Loop Until drawHi < spanHi Or (drawHi = spanHi And drawLo <= spanLo)
+        Dim resultLo As Integer = lowLo + drawLo
+        Dim resultHi As Integer = lowHi + drawHi
+        If resultLo >= 4294967296 Then
+            resultLo -= 4294967296
+            resultHi += 1
+        End If
+        Return (resultHi - 2147483648) * 4294967296 + resultLo
+    End Function
+
+    Public Function NextBernoulli(p As Double) As Boolean
+        If Not (p >= 0.0 And p <= 1.0) Then Throw New InvalidArgumentException("Probability must be in [0,1]")
+        If p = 0.0 Then Return False
+        If p = 1.0 Then Return True
+        Return Me.NextDouble() < p
+    End Function
+
+    Public Function NextExponential(rate As Double) As Double
+        If Not (rate > 0.0 And rate <= 1.7976931348623157e308) Then Throw New InvalidArgumentException("Rate must be finite and positive")
+        Dim u As Double = Me.NextDouble()
+        While u = 0.0
+            u = Me.NextDouble()
+        End While
+        Return -Math.Log(u) / rate
+    End Function
+
+    ''' Box-Muller, no cached spare: two uniform draws per accepted nonzero first draw.
+    Public Function NextNormal(mean As Double = 0.0, sd As Double = 1.0) As Double
+        If Not (mean >= -1.7976931348623157e308 And mean <= 1.7976931348623157e308) Then Throw New InvalidArgumentException("Mean must be finite")
+        If Not (sd >= 0.0 And sd <= 1.7976931348623157e308) Then Throw New InvalidArgumentException("Standard deviation must be finite and nonnegative")
+        If sd = 0.0 Then Return mean
+        Dim u As Double = Me.NextDouble()
+        While u = 0.0
+            u = Me.NextDouble()
+        End While
+        Dim v As Double = Me.NextDouble()
+        Return mean + sd * (Math.Sqrt(-2.0 * Math.Log(u)) * Math.Cos(6.2831853071795864769 * v))
+    End Function
+
+    ''' Version 1: [1, index, 624 words]. Always returns a detached array.
+    Public Function ExportState() As Array Of Integer
+        Dim state As Array Of Integer = []
+        Array.Append(state, 1)
+        Array.Append(state, mIndex)
+        For Each word As Integer In mWords
+            Array.Append(state, word)
+        Next
+        Return state
+    End Function
+
+    ''' Validate fully before replacing state. All-zero state is rejected.
+    Public Sub RestoreState(state As Array Of Integer)
+        If Array.Count(state) <> 626 Then Throw New InvalidArgumentException("State must have 626 entries")
+        If state(0) <> 1 Or state(1) < 0 Or state(1) > 624 Then Throw New InvalidArgumentException("Invalid state version or index")
+        Dim anyWord As Boolean = False
+        For i As Integer = 2 To 625
+            If state(i) < 0 Or state(i) > 4294967295 Then Throw New InvalidArgumentException("Invalid state word")
+            If state(i) <> 0 Then anyWord = True
+        Next
+        If Not anyWord Then Throw New InvalidArgumentException("All-zero state is forbidden")
+        Dim words As Array Of Integer = []
+        For i As Integer = 2 To 625
+            Array.Append(words, state(i))
+        Next
+        mWords = words
+        mIndex = state(1)
+    End Sub
+
+    Public Function Clone() As RandomGenerator
+        Dim copy As New RandomGenerator(0)
+        copy.RestoreState(Me.ExportState())
+        Return copy
+    End Function
+End Class
+
+''' Fisher-Yates in place. The array is mutated; no draws for zero/one item.
+Public Sub Shuffle Of T(generator As RandomGenerator, items As Array Of T)
+    If generator = Nil Then Throw New InvalidArgumentException("Generator is Nil")
+    Dim i As Integer = Array.Count(items) - 1
+    While i > 0
+        Dim j As Integer = generator.NextInteger(0, i)
+        Dim saved As T = items(i)
+        items(i) = items(j)
+        items(j) = saved
+        i -= 1
+    End While
+End Sub
+
+Public Function Choice Of T(generator As RandomGenerator, items As Array Of T) As T
+    If generator = Nil Then Throw New InvalidArgumentException("Generator is Nil")
+    If Array.Count(items) = 0 Then Throw New InvalidArgumentException("Choice requires a nonempty array")
+    Return items(generator.NextInteger(0, Array.Count(items) - 1))
+End Function
+
+''' Ordered sample of positions without replacement; input is unchanged.
+Public Function Sample Of T(generator As RandomGenerator, items As Array Of T, count As Integer) As Array Of T
+    If generator = Nil Then Throw New InvalidArgumentException("Generator is Nil")
+    If count < 0 Or count > Array.Count(items) Then Throw New InvalidArgumentException("Sample count outside array bounds")
+    Dim sampled As Array Of T = []
+    If count = 0 Then Return sampled
+    Dim copy As Array Of T = []
+    For Each item As T In items
+        Array.Append(copy, item)
+    Next
+    For i As Integer = 0 To count - 1
+        Dim j As Integer = generator.NextInteger(i, Array.Count(copy) - 1)
+        Dim saved As T = copy(i)
+        copy(i) = copy(j)
+        copy(j) = saved
+        Array.Append(sampled, copy(i))
+    Next
+    Return sampled
+End Function

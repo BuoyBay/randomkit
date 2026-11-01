@@ -1,0 +1,15 @@
+Import randomkit
+
+Sub Main()
+    Dim generator As New RandomGenerator(5489)
+    Print generator.NextWord()
+    Print generator.NextInteger(-10, 10)
+    Print generator.NextDouble()
+    Dim cards As Array Of String = ["ace", "king", "queen"]
+    Shuffle(generator, cards)
+    Print Choice(generator, cards)
+    Dim hand As Array Of String = Sample(generator, cards, 2)
+    Print Array.Count(hand)
+    Dim copy As RandomGenerator = generator.Clone()
+    Print copy.NextWord() = generator.NextWord()
+End Sub
