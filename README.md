@@ -1,4 +1,4 @@
-# Reproducible random sequences and samples
+# Reproducible RNG
 
 Owned, explicitly seeded, reproducible noncryptographic MT19937 generators with
 no native dependencies. Import `randomkit` from `randomkit-0.1.0.buipkg`. No dependencies, FFI, entropy
