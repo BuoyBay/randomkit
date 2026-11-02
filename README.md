@@ -1,4 +1,4 @@
-# Generate reproducible random sequences and samples
+# Reproducible random sequences and samples
 
 Owned, explicitly seeded, reproducible noncryptographic MT19937 generators with
 no native dependencies. Import `randomkit` from `randomkit-0.1.0.buipkg`. No dependencies, FFI, entropy
@@ -27,7 +27,7 @@ consumer project for reproducible installs.
 
 ## Example
 
-```buoy
+```basic
 Import randomkit
 
 Sub Main()
