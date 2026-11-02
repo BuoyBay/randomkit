@@ -1,7 +1,7 @@
 # Generate reproducible random sequences and samples
 
-Owned, explicitly seeded, reproducible noncryptographic MT19937 generators in pure
-Buoy. Import `randomkit` from `randomkit-0.1.0.buipkg`. No dependencies, FFI, entropy
+Owned, explicitly seeded, reproducible noncryptographic MT19937 generators with
+no native dependencies. Import `randomkit` from `randomkit-0.1.0.buipkg`. No dependencies, FFI, entropy
 source, or calls to the built-in global `Random` namespace are used by the package.
 See [the standalone example](examples/randomkit/main.bui),
 [API reference](resources/buoy-docs/api.md), and [provenance](PROVENANCE.md).
@@ -64,8 +64,6 @@ On your own machine, install Buoy and run:
 ```sh
 buoy ai init --both
 ```
-
-The generated agent files and editor settings stay local and are ignored by Git.
 
 ## Contributing
 

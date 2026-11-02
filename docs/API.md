@@ -28,5 +28,3 @@ State export/restore copies arrays and is intended for reproducibility, not secu
 storage. Restored states are structurally validated, not certified reachable from
 a seed. Normal output has no cached spare. No automatic/OS seeding, jumping,
 splitting, parallel stream guarantees, or cryptographic properties are provided.
-
-Maintainers run the private validation suite before release. See the repository README for public build instructions.

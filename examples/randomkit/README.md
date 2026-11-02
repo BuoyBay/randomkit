@@ -19,5 +19,3 @@ For a standalone consumer, copy `main.bui` into a fresh directory and place
 or services are required.
 
 The first word is `3499211612`, the hand has two cards, and the final comparison is true. Shuffle and sampling consume draws; changing their order changes subsequent output. This generator is for reproducible simulations, not security.
-
-Maintainers run the private validation suite before release. See the repository README for public build instructions.
